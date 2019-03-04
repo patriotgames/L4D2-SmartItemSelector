@@ -13,9 +13,9 @@ Complete Details and Installation Instructions: <a href="https://forums.alliedmo
 
 <B>Change Log:</B>
 
-1.1 (1-Mar-2019)
+v1.1 (1-Mar-2019)
     - corrected mismatched config and selection values for primary and melee weapons
     - reformatted & wrapped cvar descriptions so all values print in the cfg file
 
-1.0 (24-Feb-2019)
+v1.0 (24-Feb-2019)
     - Initial release.
