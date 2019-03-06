@@ -13,6 +13,13 @@ Complete Details and Installation Instructions: <a href="https://forums.alliedmo
 
 <B>Change Log:</B>
 
+v1.2 (5-Mar-2019)
+	- Added cvar to choose which weapon is active after items are given.
+	- Added code to change game cvar "survivor_respawn_with_guns" value to "0"
+	- Added chat message that prints if the knife is selected but knife unlock plugin is not running
+	- Removed duplicate chainsaw entries in l4d2_weapon_stocks_sis.inc so sIs will compile on sm 1.10
+	- Added a formatted l4d2_smart_item_selector.cfg file with all cvars organized into logical groups
+
 v1.1 (1-Mar-2019)
     - corrected mismatched config and selection values for primary and melee weapons
     - reformatted & wrapped cvar descriptions so all values print in the cfg file

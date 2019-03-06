@@ -1,10 +1,17 @@
 /*
 ==========================================================================
+	
 	Change Log:
 	
 	v1.1 (1-Mar-2019)
 	 - corrected mismatched config and selection values for primary and melee weapons.
 	 - shortened primary weapon cvar descriptions so all values will print in cfg file.
+	 
+	v1.2 (5-Mar-2019)
+	 - Added cvar to choose which weapon is active after items are given.
+	 - Added code to change game cvar "survivor_respawn_with_guns" value to "0"
+	 - Added chat message that prints if the knife is selected but knife unlock plugin is not running
+	 - Removed duplicate chainsaw entries in l4d2_weapon_stocks_sis.inc so sIs will compile on sm 1.10
 
 ==========================================================================
 */
@@ -17,7 +24,7 @@
 #include <l4d2_weapon_stocks_sis>
 #pragma newdecls required
 
-#define PLUGIN_VERSION "1.1"
+#define PLUGIN_VERSION "1.2"
 
 public Plugin myinfo =
 {
@@ -35,10 +42,14 @@ public Plugin myinfo =
 #define L4D2_WEPUPGFLAG_EXPLOSIVE       (1 << 1)
 #define L4D2_WEPUPGFLAG_LASER 			(1 << 2)
 
+#define RESPAWN_PISTOL_ONLY true
+
 ConVar g_cvSmartItemEnable;
 ConVar g_cvSendInfoMessage;
 ConVar g_cvVipFlags;
 ConVar g_cvRemovePistol;
+ConVar g_cvLastSlot;
+ConVar g_cvRespawnWithGuns;
 
 ConVar g_cvPrimaryChoice;
 ConVar g_cvSecondaryChoice;
@@ -64,6 +75,8 @@ ConVar g_cvKnifeUnlockFound;
 
 char g_sVipFlags[22];
 bool g_bKnifeUnlockFound = false;
+bool g_bLast[MAXPLAYERS+1];
+bool g_bKnifeWarningPrinted[MAXPLAYERS+1];
 
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
@@ -95,6 +108,7 @@ public void OnPluginStart()
 	g_cvSendInfoMessage = CreateConVar("l4d2_sis_info_message", "0", "Send each player a message informing them which item(s) they recieved?. 0=off, 1=on.", FCVAR_NOTIFY);
 	g_cvVipFlags = CreateConVar("l4d2_sis_vip_flags", "a", "Survivors with any of these flags will receive VIP/admin items.\n[example admin flags: a=Reservation, b=Generic, c=Kick, d=Ban, o=custom1, etc.]");
 	g_cvRemovePistol = CreateConVar("l4d2_sis_remove_pistol", "1", "Remove the default pistol before giving another secondary weapon?. 0=No, 1=Yes.", FCVAR_NOTIFY);
+	g_cvLastSlot = CreateConVar("l4d2_sis_lastslot", "1", "Weapon slot to equip after all weapons/items are given.\n1=primary, 2=secondary, 3=throwable, 4=healthkit, 5=meds", _, true, 1.0, true, 5.0);
 	
 	/* Item Supply */
 	g_cvPrimaryChoice = CreateConVar("l4d2_sis_primary_choice", "0", "Give survivors a Primary Weapon?\n0=disable, 1=pump shotgun, 2=chrome shotgun, 3=spas shotgun, 4=autoshotgun, 5=smg, 6=smg silenced, 7=smg mp5, 8=M16, 9=AK47, 10=Desert rifle, 11=SG552, 12=Hunting rifle, 13=Scout sniper, 14=Military sniper, 15=AWP sniper", FCVAR_NOTIFY);
@@ -120,10 +134,19 @@ public void OnPluginStart()
 	g_cvVipMedsChoice = CreateConVar("l4d2_sis_vip_meds_choice", "0", "Give VIPs Meds? Overrides ALL meds settings. 0=disable, 1=pills, 2=adrenaline", FCVAR_NOTIFY);
 	g_cvVipUpgradeChoice = CreateConVar("l4d2_sis_vip_upgrade_choice", "0", "Give VIPs an Upgrade? Overrides ALL upgrade settings. 0=disable, 1=laser, 2=incendiary ammo, 3=explosive ammo", FCVAR_NOTIFY);
 	
+	g_cvRespawnWithGuns = FindConVar("survivor_respawn_with_guns"); // we'll change this default cvar so primary weapons are not blocked for respawned survivors
+	
 	CreateConVar("l4d2_smart_item_selector_version", PLUGIN_VERSION, "Smart Item Selector plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	AutoExecConfig(true, "l4d2_smart_item_selector");
-	
+		
 	HookEvent("player_spawn", Event_PlayerSpawn);
+}
+
+public void OnConfigsExecuted()
+{
+	#if RESPAWN_PISTOL_ONLY
+		g_cvRespawnWithGuns.IntValue = 0;
+	#endif
 }
 
 public Action Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
@@ -152,12 +175,17 @@ static void CheckForItems(int client, bool bIsVip)
 {
 	if (IsLivingSurvivor(client))
 	{
+		g_bLast[client] = false;
 		g_cvVipFlags.GetString(g_sVipFlags, sizeof(g_sVipFlags));
 		int iVipFlags = ReadFlagString(g_sVipFlags);
 		
 		if (CheckCommandAccess(client, "sis_vip", iVipFlags))
 		{
 			bIsVip = true;
+		}
+		if(!g_bKnifeUnlockFound && (g_cvSecondaryChoice.IntValue == 2 || g_cvVipSecondaryChoice.IntValue == 2))
+		{
+			PrintKnifeMessage(client, bIsVip);
 		}
 		if (g_cvPrimaryChoice.IntValue > 0 || g_cvRandomPrimary.BoolValue || g_cvVipPrimaryChoice.IntValue > 0)
 		{
@@ -259,6 +287,23 @@ static void CheckForItems(int client, bool bIsVip)
 			}
 		}
 	}
+	g_bLast[client] = true;
+}
+
+public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3], float angles[3], int& iActiveWeapon, int& subtype, int& cmdnum, int& tickcount, int& seed, int mouse[2])
+{
+    if (!IsLivingSurvivor(client) || !g_bLast[client])
+    {
+            g_bLast[client] = false;
+            return Plugin_Continue;
+    }
+
+    if (g_bLast[client])
+    {
+            g_bLast[client] = false;
+            iActiveWeapon = GetPlayerWeaponSlot(client, g_cvLastSlot.IntValue - 1);
+    }
+    return Plugin_Continue;
 }
 
 static void SelectPrimary(int client, bool bIsVip)
@@ -459,7 +504,7 @@ static void GiveItem(int client, char Item[22])
 	SetCommandFlags("give", flags|FCVAR_CHEAT);
 }
 
-void GiveUpgrade(int client, char Upgrade[22])
+static void GiveUpgrade(int client, char Upgrade[22])
 {
 	int flags = GetCommandFlags("upgrade_add");
 	SetCommandFlags("upgrade_add", flags & ~FCVAR_CHEAT);
@@ -470,6 +515,20 @@ void GiveUpgrade(int client, char Upgrade[22])
 		PrintToChat(client, "%s%t", TAG_SIS, Upgrade);
 	}
 	SetCommandFlags("upgrade_add", flags|FCVAR_CHEAT);
+}
+
+static void PrintKnifeMessage(int client, bool bIsVip)
+{
+	char message[16];
+	Format(message, sizeof(message), "knife_warning");
+	if(bIsVip && (g_cvVipSecondaryChoice.IntValue == 2 || g_cvVipSecondaryChoice.IntValue == 0 && g_cvSecondaryChoice.IntValue == 2) || !bIsVip && g_cvSecondaryChoice.IntValue == 2)
+	{
+		if(!g_bKnifeWarningPrinted[client])
+		{
+			PrintToChat(client, "%s%t", TAG_SIS, message);
+			g_bKnifeWarningPrinted[client] = true;
+		}
+	}
 }
 
 stock bool IsLivingSurvivor(int client)
@@ -518,16 +577,16 @@ stock int MeleeSelectId(int item)
 	switch (item)
 	{
 		case 2: return 1;	//WEPID_KNIFE
-		case 3: return 9;	//WEPID_FRYING_PAN
-		case 4: return 14;	//WEPID_TONFA
-		case 5: return 5;	//WEPID_CROWBAR
-		case 6: return 4;	//WEPID_CRICKET_BAT
+		case 3: return 7;	//WEPID_FRYING_PAN
+		case 4: return 12;	//WEPID_TONFA
+		case 5: return 4;	//WEPID_CROWBAR
+		case 6: return 3;	//WEPID_CRICKET_BAT
 		case 7: return 2;	//WEPID_BASEBALL_BAT
-		case 8: return 12;	//WEPID_MACHETE
-		case 9: return 11;	//WEPID_KATANA
-		case 10: return 10;	//WEPID_GOLF_CLUB
-		case 11: return 8;	//WEPID_FIREAXE
-		case 12: return 7;	//WEPID_ELECTRIC_GUITAR
+		case 8: return 10;	//WEPID_MACHETE
+		case 9: return 9;	//WEPID_KATANA
+		case 10: return 8;	//WEPID_GOLF_CLUB
+		case 11: return 6;	//WEPID_FIREAXE
+		case 12: return 5;	//WEPID_ELECTRIC_GUITAR
 	}
 	return 0;
 }

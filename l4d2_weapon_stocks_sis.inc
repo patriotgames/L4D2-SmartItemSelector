@@ -95,18 +95,16 @@ enum MeleeWeaponId
     WEPID_MELEE_NONE,		//0
     WEPID_KNIFE,			//1
     WEPID_BASEBALL_BAT,		//2
-    WEPID_CHAINSAW,			//3
-    WEPID_CRICKET_BAT,		//4
-    WEPID_CROWBAR,			//5
-    WEPID_DIDGERIDOO,		//6
-    WEPID_ELECTRIC_GUITAR,	//7
-    WEPID_FIREAXE,			//8
-    WEPID_FRYING_PAN,		//9
-    WEPID_GOLF_CLUB,		//10
-    WEPID_KATANA,			//11
-    WEPID_MACHETE,			//12
-    WEPID_RIOT_SHIELD,		//13
-    WEPID_TONFA				//14
+    WEPID_CRICKET_BAT,		//3
+    WEPID_CROWBAR,			//4
+    WEPID_ELECTRIC_GUITAR,	//5
+    WEPID_FIREAXE,			//6
+    WEPID_FRYING_PAN,		//7
+    WEPID_GOLF_CLUB,		//8
+    WEPID_KATANA,			//9
+    WEPID_MACHETE,			//10
+    WEPID_RIOT_SHIELD,		//11
+    WEPID_TONFA				//12
 };
 
 // Weapon names for each of the weapons, used in identification.
@@ -139,10 +137,8 @@ char MeleeWeaponNames[MeleeWeaponId][] =
     "",
     "knife",
     "baseball_bat",
-    "chainsaw",
     "cricket_bat",
     "crowbar",
-    "didgeridoo",
     "electric_guitar",
     "fireaxe",
     "frying_pan",
@@ -158,10 +154,8 @@ char MeleeWeaponModels[MeleeWeaponId][] =
     "",
     "/w_models/weapons/w_knife_t.mdl",
     "/weapons/melee/w_bat.mdl",
-    "/weapons/melee/w_chainsaw.mdl",
     "/weapons/melee/w_cricket_bat.mdl",
     "/weapons/melee/w_crowbar.mdl",
-    "/weapons/melee/w_didgeridoo.mdl",
     "/weapons/melee/w_electric_guitar.mdl",
     "/weapons/melee/w_fireaxe.mdl",
     "/weapons/melee/w_frying_pan.mdl",
